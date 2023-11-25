@@ -31,7 +31,7 @@ const verifyToken = (req, res, next) => {
     if (err) {
       return res.status(401).send({ message: "401, You're not authorized" });
     }
-    req.user = decoded;
+    req.decoded = decoded;
     // console.log("user index.js---> ", decoded)
     next();
   });
@@ -53,6 +53,7 @@ async function run() {
 
     const database = client.db("edugramDB");
     const userCollection = database.collection("users");
+    const teacherRequestCollection = database.collection("teacherRequests");
 
     // auth related endpoints
     app.post("/api/v1/auth/access-token", (req, res) => {
@@ -74,17 +75,26 @@ async function run() {
       const queryEmail = req.query.email;
       // console.log("req--->",req)
       // console.log("query email from api--->",queryEmail)
-      if (queryEmail !== req.user.email) {
+      if (queryEmail !== req.decoded.email) {
         return res.status(403).send({ message: "Forbidden" });
       }
       const query = { email: queryEmail };
+      const user = await userCollection.findOne(query);    
+      res.send({user});
+    });
+
+    app.get("/api/v1/users/admin/:email", verifyToken, async (req, res) => {
+      const paramEmail = req.params.email;
+      if (paramEmail !== req.decoded.email) {
+        return res.status(403).send({ message: "Forbidden" });
+      }
+      const query = { email: paramEmail };
       const user = await userCollection.findOne(query);
-      // res.send(user);
       let admin = false;
       if (user) {
         admin = user?.role === "admin";
       }
-      res.send({user, admin });
+      res.send({ admin });
     });
 
     app.post("/api/v1/users", async (req, res) => {
@@ -97,6 +107,13 @@ async function run() {
       const result = await userCollection.insertOne(user);
       res.send(result);
     });
+
+    // teacher request related endpoints
+    app.post("/api/v1/users/teacher-requests", verifyToken, async (req, res)=>{
+      const teacherReq = req.body;
+      const result = await teacherRequestCollection.insertOne(teacherReq);
+      res.send(result);
+    })
 
 
     // Send a ping to confirm a successful connection
