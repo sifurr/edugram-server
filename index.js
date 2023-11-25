@@ -1,22 +1,41 @@
 const express = require("express");
-require("dotenv").config();
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+require("dotenv").config();
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 const app = express();
 const port = process.env.PORT || 5000;
-const cookieParser = require("cookie-parser");
-const jwt = require("jsonwebtoken");
 
-// middlewares
+//middlewares
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174"
+    ],
     credentials: true,
   })
 );
 app.use(express.json());
 app.use(cookieParser());
 
+const verifyToken = (req, res, next) => {
+  const token = req.cookies?.token;
+  // console.log("token index.js--> ",token);
+  if (!token) {
+    return res.status(401).send({ message: "401, Your're not authorized" });
+  }
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: "401, You're not authorized" });
+    }
+    req.user = decoded;
+    // console.log("user index.js---> ", decoded)
+    next();
+  });
+};
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ddl1jzo.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -30,7 +49,6 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-   
     // await client.connect();
 
     const database = client.db("edugramDB");
@@ -38,7 +56,6 @@ async function run() {
 
     // auth related endpoints
     app.post("/api/v1/auth/access-token", (req, res) => {
-
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: "1h",
@@ -47,13 +64,29 @@ async function run() {
       res
         .cookie("token", token, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+          secure: false,
+          // sameSite: "none",
         })
         .send({ success: true });
     });
 
-    // user related end points
+    app.get("/api/v1/users", verifyToken, async (req, res) => {
+      const queryEmail = req.query.email;
+      // console.log("req--->",req)
+      // console.log("query email from api--->",queryEmail)
+      if (queryEmail !== req.user.email) {
+        return res.status(403).send({ message: "Forbidden" });
+      }
+      const query = { email: queryEmail };
+      const user = await userCollection.findOne(query);
+      // res.send(user);
+      let admin = false;
+      if (user) {
+        admin = user?.role === "admin";
+      }
+      res.send({user, admin });
+    });
+
     app.post("/api/v1/users", async (req, res) => {
       const user = req.body;
       const query = { email: user.email };
@@ -62,8 +95,9 @@ async function run() {
         return res.send({ message: "user already exists", insertedId: null });
       }
       const result = await userCollection.insertOne(user);
-      return res.send(result);
+      res.send(result);
     });
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
