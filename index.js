@@ -205,6 +205,68 @@ async function run() {
       }
     );
 
+    app.patch(
+      "/api/v1/users/make-teacher/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const requestId = req.params.id;
+        const filter = { _id: new ObjectId(requestId) };
+        const teacherRequest = await teacherRequestCollection.findOne(filter);
+
+        if (teacherRequest) {
+          const userEmail = teacherRequest.email;
+          // console.log("user email",userEmail)
+          const userFilter = { email: userEmail };
+          // console.log("user filer",userFilter)
+
+          const statusUpdateDoc = {
+            $set: { approval: "approved" }
+          };
+          await teacherRequestCollection.updateOne(filter, statusUpdateDoc);
+
+          const userRoleUpdateDoc = {
+            $set: { role: "teacher" }
+          };
+
+          const result = await userCollection.updateOne(
+            userFilter,
+            userRoleUpdateDoc
+          );
+
+          res.send({ success: true, message: "User is now a teacher", result });
+        }
+      }
+    );  
+
+    app.patch(
+      "/api/v1/users/reject-teacher/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const requestId = req.params.id;
+        const filter = { _id: new ObjectId(requestId) };
+        const teacherRequest = await teacherRequestCollection.findOne(filter);
+
+        if (teacherRequest) {
+          const userEmail = teacherRequest.email;
+          const userFilter = { email: userEmail };
+
+          const statusUpdateDoc = {
+            $set: { approval: "pending" },
+          };
+          await teacherRequestCollection.updateOne(filter, statusUpdateDoc);
+
+          const userRoleUpdateDoc = {
+            $set: { role: "student" }
+          };
+          const result = await userCollection.updateOne(userFilter, userRoleUpdateDoc);
+
+          res.send({ success: true, message: "Teacher request rejected", result });
+        }
+      }
+    );
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
