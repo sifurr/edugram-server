@@ -51,6 +51,7 @@ async function run() {
 
     const database = client.db("edugramDB");
     const userCollection = database.collection("users");
+    const classCollection = database.collection("classes");
     const teacherRequestCollection = database.collection("teacherRequests");
 
     // auth related endpoints
@@ -266,6 +267,14 @@ async function run() {
         }
       }
     );
+
+    // class related endpoints
+    app.post("/api/v1/users/classes", verifyToken, verifyTeacher, async (req, res)=>{
+      const classInfo = req.body;
+      console.log(classInfo)
+      const result = await classCollection.insertOne(classInfo);
+      res.send(result); 
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
