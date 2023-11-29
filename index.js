@@ -6,6 +6,7 @@ const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const app = express();
 const port = process.env.PORT || 5000;
+const stripe = require("stripe")(process.env.PAYMENT_GATEWAY_SECRET);
 
 //middlewares
 app.use(
@@ -52,6 +53,8 @@ async function run() {
     const database = client.db("edugramDB");
     const userCollection = database.collection("users");
     const classCollection = database.collection("classes");
+    const cartCollection = database.collection("carts");
+    const paymentCollection = database.collection("payments");
     const teacherRequestCollection = database.collection("teacherRequests");
 
     // auth related endpoints
@@ -295,6 +298,15 @@ async function run() {
     );
 
     // class related endpoints
+    app.get("/api/v1/classes/:id", verifyToken, async (req, res) => {
+        const id = req.params.id;
+        // console.log("id class req", id);
+        const query = { _id: new ObjectId(id) };
+        const result = await classCollection.findOne(query);
+        res.send(result);
+      }
+    );
+
     app.get(
       "/api/v1/users/classes/:id",
       verifyToken,
@@ -404,6 +416,71 @@ async function run() {
         res.send(result);
       }
     );
+
+    // cart related endpoints
+    app.get("/api/v1/carts", async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      const result = await cartCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.post("/api/v1/carts", async (req, res) => {
+      const cartItem = req.body;
+      // console.log(cartItem)
+      const result = await cartCollection.insertOne(cartItem);
+      res.send(result);
+    });
+
+    app.delete("/api/v1/carts/:id", async (req, res) => {
+      const id = req.params.id;   
+      // console.log("delete id: ", id); 
+      const query = { _id: new ObjectId(id) };
+      const result = await cartCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // payments related endpoints
+    app.get("/api/v1/payments/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      const result = await paymentCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.post("/api/v1/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+
+    app.post("/api/v1/payments", async (req, res) => {
+      const payment = req.body;
+      const paymentResult = await paymentCollection.insertOne(payment);
+      // console.log("Payment info: ",payment);
+      const query = {
+        _id: { $in: payment.cartIds.map((id) => new ObjectId(id)) },
+      };
+      const deleteResult = await cartCollection.deleteMany(query);
+      res.send({ paymentResult, deleteResult });
+    });
+
+
+
+
+
+
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
