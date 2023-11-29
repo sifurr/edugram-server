@@ -222,12 +222,12 @@ async function run() {
           // console.log("user filer",userFilter)
 
           const statusUpdateDoc = {
-            $set: { approval: "approved" }
+            $set: { approval: "approved" },
           };
           await teacherRequestCollection.updateOne(filter, statusUpdateDoc);
 
           const userRoleUpdateDoc = {
-            $set: { role: "teacher" }
+            $set: { role: "teacher" },
           };
 
           const result = await userCollection.updateOne(
@@ -238,7 +238,7 @@ async function run() {
           res.send({ success: true, message: "User is now a teacher", result });
         }
       }
-    );  
+    );
 
     app.patch(
       "/api/v1/users/reject-teacher/:id",
@@ -259,22 +259,136 @@ async function run() {
           await teacherRequestCollection.updateOne(filter, statusUpdateDoc);
 
           const userRoleUpdateDoc = {
-            $set: { role: "student" }
+            $set: { role: "student" },
           };
-          const result = await userCollection.updateOne(userFilter, userRoleUpdateDoc);
+          const result = await userCollection.updateOne(
+            userFilter,
+            userRoleUpdateDoc
+          );
 
-          res.send({ success: true, message: "Teacher request rejected", result });
+          res.send({
+            success: true,
+            message: "Teacher request rejected",
+            result,
+          });
         }
       }
     );
 
     // class related endpoints
-    app.post("/api/v1/users/classes", verifyToken, verifyTeacher, async (req, res)=>{
+    app.get(
+      "/api/v1/users/classes/:id",
+      verifyToken,
+      verifyTeacher,
+      async (req, res) => {
+        const id = req.params.id;
+        // console.log("id class req", id);
+        const query = { _id: new ObjectId(id) };
+        const result = await classCollection.findOne(query);
+        res.send(result);
+      }
+    );
+
+    app.get(
+      "/api/v1/users/classes-requests",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {        
+        const result = await classCollection.find().toArray();
+        res.send(result);
+      }
+    );
+
+    app.get(
+      "/api/v1/users/all-classes",      
+      async (req, res) => {
+        const query = { status: "approved" };
+        const result = await classCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
+
+    app.get(
+      "/api/v1/users/classes",
+      verifyToken,
+      verifyTeacher,
+      async (req, res) => {
+        const email = req.query.email;
+        // console.log("email class req", email);
+        const query = { email: email };
+        const result = await classCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
+
+    app.post(
+      "/api/v1/users/classes",
+      verifyToken,
+      verifyTeacher,
+      async (req, res) => {
+        const classInfo = req.body;
+        // console.log(classInfo);
+        const result = await classCollection.insertOne(classInfo);
+        res.send(result);
+      }
+    );
+
+    app.patch("/api/v1/users/classes/:id",verifyToken, verifyTeacher, async (req, res) => {
+      const id = req.params.id;
+      // console.log("patch id--->", id)
       const classInfo = req.body;
-      console.log(classInfo)
-      const result = await classCollection.insertOne(classInfo);
-      res.send(result); 
-    })
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          title: classInfo.title,         
+          price: classInfo.price,
+          description: classInfo.description,
+          image: classInfo.image,
+        },
+      };
+
+      const result = await classCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    app.patch("/api/v1/users/class-status/:id",verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      // console.log("patch approved id--->", id)
+      const classInfo = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          status: classInfo.status
+        },
+      };
+
+      const result = await classCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    app.delete(
+      "/api/v1/users/classes/:id",
+      verifyToken,
+      verifyTeacher,
+      async (req, res) => {
+        const id = req.params.id;
+        // console.log("id class req", id);
+        const query = { _id: new ObjectId(id) };
+        const result = await classCollection.deleteOne(query);
+        res.send(result);
+      }
+    );
+
+
+
+
+
+
+
+
+
+
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
