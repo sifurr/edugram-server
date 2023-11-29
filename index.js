@@ -154,6 +154,25 @@ async function run() {
       }
     );
 
+    app.patch(
+      "/api/v1/users/add-phone/:email",
+      verifyToken,
+      async (req, res) => {
+        const userEmail = req.params.email;
+        const tokenMail = req.decoded.email;
+        const filter = {email: userEmail}
+        if (userEmail !== tokenMail) {
+          return res.status(403).send({ message: "Forbidden" });
+        }
+        const userPhone = req.body;
+        const updateDoc = {
+          $set: { phone: userPhone.phone },
+        };
+        const result = await userCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      }
+    );
+
     // teacher request related endpoints
     app.get("/api/v1/users/teacher/:email", verifyToken, async (req, res) => {
       const paramEmail = req.params.email;
@@ -293,20 +312,17 @@ async function run() {
       "/api/v1/users/classes-requests",
       verifyToken,
       verifyAdmin,
-      async (req, res) => {        
+      async (req, res) => {
         const result = await classCollection.find().toArray();
         res.send(result);
       }
     );
 
-    app.get(
-      "/api/v1/users/all-classes",      
-      async (req, res) => {
-        const query = { status: "approved" };
-        const result = await classCollection.find(query).toArray();
-        res.send(result);
-      }
-    );
+    app.get("/api/v1/users/all-classes", async (req, res) => {
+      const query = { status: "approved" };
+      const result = await classCollection.find(query).toArray();
+      res.send(result);
+    });
 
     app.get(
       "/api/v1/users/classes",
@@ -333,38 +349,48 @@ async function run() {
       }
     );
 
-    app.patch("/api/v1/users/classes/:id",verifyToken, verifyTeacher, async (req, res) => {
-      const id = req.params.id;
-      // console.log("patch id--->", id)
-      const classInfo = req.body;
-      const query = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: {
-          title: classInfo.title,         
-          price: classInfo.price,
-          description: classInfo.description,
-          image: classInfo.image,
-        },
-      };
+    app.patch(
+      "/api/v1/users/classes/:id",
+      verifyToken,
+      verifyTeacher,
+      async (req, res) => {
+        const id = req.params.id;
+        // console.log("patch id--->", id)
+        const classInfo = req.body;
+        const query = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: {
+            title: classInfo.title,
+            price: classInfo.price,
+            description: classInfo.description,
+            image: classInfo.image,
+          },
+        };
 
-      const result = await classCollection.updateOne(query, updateDoc);
-      res.send(result);
-    });
+        const result = await classCollection.updateOne(query, updateDoc);
+        res.send(result);
+      }
+    );
 
-    app.patch("/api/v1/users/class-status/:id",verifyToken, verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      // console.log("patch approved id--->", id)
-      const classInfo = req.body;
-      const filter = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: {
-          status: classInfo.status
-        },
-      };
+    app.patch(
+      "/api/v1/users/class-status/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        // console.log("patch approved id--->", id)
+        const classInfo = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: {
+            status: classInfo.status,
+          },
+        };
 
-      const result = await classCollection.updateOne(filter, updateDoc);
-      res.send(result);
-    });
+        const result = await classCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      }
+    );
 
     app.delete(
       "/api/v1/users/classes/:id",
@@ -378,17 +404,6 @@ async function run() {
         res.send(result);
       }
     );
-
-
-
-
-
-
-
-
-
-
-
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
