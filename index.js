@@ -59,7 +59,8 @@ async function run() {
     const paymentCollection = database.collection("payments");
     const teacherRequestCollection = database.collection("teacherRequests");
     const feedbackCollection = database.collection("feedbacks");
-    
+    const assignmentCollection = database.collection("assignments");
+    const submissionCollection = database.collection("submissions");
 
     // auth related endpoints
     app.post("/api/v1/auth/access-token", (req, res) => {
@@ -513,13 +514,57 @@ async function run() {
       res.send({ paymentResult, deleteResult });
     });
 
-
     // feedback related endpoints
-    app.post("/api/v1/users/class-feedback", verifyToken, async (req, res)=>{
+    app.post("/api/v1/users/class-feedback", verifyToken, async (req, res) => {
       const feedback = req.body;
       const result = await feedbackCollection.insertOne(feedback);
       res.send(result);
-    })
+    });
+
+    // class assignment related endpoints
+    app.get(
+      "/api/v1/users/class-assignments/:classId",
+      verifyToken,
+      async (req, res) => {
+        const id = req.params.classId;
+        // console.log("assignment", id)
+        const query = { classId: id };
+        const result = await assignmentCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
+
+    app.post(
+      "/api/v1/users/class-assignment",
+      verifyToken,
+      verifyTeacher,
+      async (req, res) => {
+        const assignment = req.body;
+        const result = await assignmentCollection.insertOne(assignment);
+        res.send(result);
+      }
+    );
+
+    // assignment submission related endpoints
+    app.get(
+      "/api/v1/users/assignments-submissions/:classId", verifyToken, verifyTeacher,
+      async (req, res) => {
+        const classId = req.params.classId;
+        // const query = { classId: id };
+        const totalSubmission = await submissionCollection.countDocuments({classId});       
+        res.send({totalSubmission});
+      }
+    );
+
+    app.post(
+      "/api/v1/users/assignments-submissions", verifyToken,
+      async (req, res) => {
+        const submission = req.body;
+        const result = await submissionCollection.insertOne(submission);        
+        res.send(result);
+      }
+    );
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
