@@ -20,7 +20,9 @@ app.use(cookieParser());
 
 const verifyToken = (req, res, next) => {
   const token = req.cookies?.token;
-  // console.log("token index.js--> ",token);
+  // console.log("Cookies:", req.cookies);
+  // console.log("Cookies:", token);
+
   if (!token) {
     return res.status(401).send({ message: "401, Your're not authorized" });
   }
@@ -163,7 +165,7 @@ async function run() {
       async (req, res) => {
         const userEmail = req.params.email;
         const tokenMail = req.decoded.email;
-        const filter = {email: userEmail}
+        const filter = { email: userEmail };
         if (userEmail !== tokenMail) {
           return res.status(403).send({ message: "Forbidden" });
         }
@@ -298,14 +300,48 @@ async function run() {
     );
 
     // class related endpoints
-    app.get("/api/v1/classes/:id", verifyToken, async (req, res) => {
-        const id = req.params.id;
-        // console.log("id class req", id);
-        const query = { _id: new ObjectId(id) };
-        const result = await classCollection.findOne(query);
-        res.send(result);
+    app.get("/api/v1/users/classes/:email", verifyToken, async (req, res) => {
+      const userEmail = req.decoded.email;
+      const paramEmail = req.params.email;
+      // console.log("paramEmail:", paramEmail);
+      // console.log("decodedEmail:", req.decoded.email);
+
+      if (paramEmail !== userEmail) {
+        return res.status(403).send({ message: "forbidden access" });
       }
-    );
+      const userPayments = await paymentCollection
+        .find({ email: userEmail })
+        .toArray();
+      const uniqueClassIds = [
+        ...new Set(userPayments.flatMap((payment) => payment.classId)),
+      ];
+
+      const classes = await classCollection
+        .find({
+          _id: { $in: uniqueClassIds.map((id) => new ObjectId(id)) },
+        })
+        .toArray();
+
+      const totalEnrollments = userPayments.reduce(
+        (total, payment) => total + payment.classId.length,
+        0
+      );
+
+      const uniqueStudents = [
+        ...new Set(userPayments.map((payment) => payment.email)),
+      ];
+      const uniqueStudentsCount = uniqueStudents.length;
+
+      res.send({ classes, totalEnrollments, uniqueStudentsCount });
+    });
+
+    app.get("/api/v1/classes/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      // console.log("id class req", id);
+      const query = { _id: new ObjectId(id) };
+      const result = await classCollection.findOne(query);
+      res.send(result);
+    });
 
     app.get(
       "/api/v1/users/classes/:id",
@@ -433,8 +469,8 @@ async function run() {
     });
 
     app.delete("/api/v1/carts/:id", async (req, res) => {
-      const id = req.params.id;   
-      // console.log("delete id: ", id); 
+      const id = req.params.id;
+      // console.log("delete id: ", id);
       const query = { _id: new ObjectId(id) };
       const result = await cartCollection.deleteOne(query);
       res.send(result);
@@ -474,13 +510,6 @@ async function run() {
       const deleteResult = await cartCollection.deleteMany(query);
       res.send({ paymentResult, deleteResult });
     });
-
-
-
-
-
-
-
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
