@@ -315,6 +315,7 @@ async function run() {
       const userPayments = await paymentCollection
         .find({ email: userEmail })
         .toArray();
+
       const uniqueClassIds = [
         ...new Set(userPayments.flatMap((payment) => payment.classId)),
       ];
@@ -480,6 +481,38 @@ async function run() {
     });
 
     // payments related endpoints
+    // scope position error
+    app.get(
+      "/api/v1/payments/:classId",
+      verifyToken,
+      verifyTeacher,
+      async (req, res) => {
+        const classId = req.params.classId;
+
+        const result = await paymentCollection
+          .aggregate([
+            {
+              $unwind: "$classId",
+            },
+            {
+              $match: {
+                classId: classId,
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                count: { $sum: 1 },
+              },
+            },
+          ])
+          .toArray();
+
+        const totalEnrollments = result.length > 0 ? result[0].count : 0;
+        res.send({ totalEnrollments });
+      }
+    );
+
     app.get("/api/v1/payments/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
@@ -528,9 +561,21 @@ async function run() {
       async (req, res) => {
         const id = req.params.classId;
         // console.log("assignment", id)
-        const query = { classId: id };
+        const query = { classId: id };        
         const result = await assignmentCollection.find(query).toArray();
         res.send(result);
+      }
+    );
+
+    app.get(
+      "/api/v1/users/total-class-assignments/:classId",
+      verifyToken,
+      verifyTeacher,
+      async (req, res) => {
+        const classId = req.params.classId;
+        // console.log("total assignment", classId)
+        const totalAssignments = await assignmentCollection.countDocuments({classId});        
+        res.send({totalAssignments});
       }
     );
 
@@ -547,24 +592,27 @@ async function run() {
 
     // assignment submission related endpoints
     app.get(
-      "/api/v1/users/assignments-submissions/:classId", verifyToken, verifyTeacher,
+      "/api/v1/users/assignments-submissions/:classId",
+      verifyToken,
+      verifyTeacher,
       async (req, res) => {
         const classId = req.params.classId;
-        // const query = { classId: id };
-        const totalSubmission = await submissionCollection.countDocuments({classId});       
-        res.send({totalSubmission});
+        const totalSubmission = await submissionCollection.countDocuments({
+          classId,
+        });
+        res.send({ totalSubmission });
       }
     );
 
     app.post(
-      "/api/v1/users/assignments-submissions", verifyToken,
+      "/api/v1/users/assignments-submissions",
+      verifyToken,
       async (req, res) => {
         const submission = req.body;
-        const result = await submissionCollection.insertOne(submission);        
+        const result = await submissionCollection.insertOne(submission);
         res.send(result);
       }
     );
-
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
