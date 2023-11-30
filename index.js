@@ -58,6 +58,8 @@ async function run() {
     const cartCollection = database.collection("carts");
     const paymentCollection = database.collection("payments");
     const teacherRequestCollection = database.collection("teacherRequests");
+    const feedbackCollection = database.collection("feedbacks");
+    
 
     // auth related endpoints
     app.post("/api/v1/auth/access-token", (req, res) => {
@@ -510,6 +512,14 @@ async function run() {
       const deleteResult = await cartCollection.deleteMany(query);
       res.send({ paymentResult, deleteResult });
     });
+
+
+    // feedback related endpoints
+    app.post("/api/v1/users/class-feedback", verifyToken, async (req, res)=>{
+      const feedback = req.body;
+      const result = await feedbackCollection.insertOne(feedback);
+      res.send(result);
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
