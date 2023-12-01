@@ -61,6 +61,9 @@ async function run() {
     const feedbackCollection = database.collection("feedbacks");
     const assignmentCollection = database.collection("assignments");
     const submissionCollection = database.collection("submissions");
+    const faqCollection = database.collection("faqs");
+    const partnerCollection = database.collection("partners");
+    const newsLetterCollection = database.collection("newsLetters");
 
     // auth related endpoints
     app.post("/api/v1/auth/access-token", (req, res) => {
@@ -211,7 +214,7 @@ async function run() {
       verifyToken,
       async (req, res) => {
         const paramsEmail = req.params.email;
-        // console.log("params Email",paramsEmail)
+        // console.log("params Email", paramsEmail);
         const tokenEmailFromVerifyToken = req.decoded.email;
         // console.log("token Email",tokenEmailFromVerifyToken)
         if (paramsEmail !== tokenEmailFromVerifyToken) {
@@ -302,51 +305,24 @@ async function run() {
       }
     );
 
-    // class related endpoints
-    app.get("/api/v1/users/classes/:email", verifyToken, async (req, res) => {
-      const userEmail = req.decoded.email;
-      const paramEmail = req.params.email;
-      // console.log("paramEmail:", paramEmail);
-      // console.log("decodedEmail:", req.decoded.email);
-
-      if (paramEmail !== userEmail) {
-        return res.status(403).send({ message: "forbidden access" });
+    app.get(
+      "/api/v1/users/user-teacher-request/:email",
+      verifyToken,
+      async (req, res) => {
+        const paramsEmail = req.params.email;
+        console.log("params Email", paramsEmail);
+        const tokenEmailFromVerifyToken = req.decoded.email;
+        // console.log("token Email",tokenEmailFromVerifyToken)
+        if (paramsEmail !== tokenEmailFromVerifyToken) {
+          return res.status(403).send({ message: "403, Access forbidden" });
+        }
+        const query = { email: paramsEmail };
+        const result = await userCollection.findOne(query);
+        res.send(result);
       }
-      const userPayments = await paymentCollection
-        .find({ email: userEmail })
-        .toArray();
+    );
 
-      const uniqueClassIds = [
-        ...new Set(userPayments.flatMap((payment) => payment.classId)),
-      ];
-
-      const classes = await classCollection
-        .find({
-          _id: { $in: uniqueClassIds.map((id) => new ObjectId(id)) },
-        })
-        .toArray();
-
-      const totalEnrollments = userPayments.reduce(
-        (total, payment) => total + payment.classId.length,
-        0
-      );
-
-      const uniqueStudents = [
-        ...new Set(userPayments.map((payment) => payment.email)),
-      ];
-      const uniqueStudentsCount = uniqueStudents.length;
-
-      res.send({ classes, totalEnrollments, uniqueStudentsCount });
-    });
-
-    app.get("/api/v1/classes/:id", verifyToken, async (req, res) => {
-      const id = req.params.id;
-      // console.log("id class req", id);
-      const query = { _id: new ObjectId(id) };
-      const result = await classCollection.findOne(query);
-      res.send(result);
-    });
-
+    // class related endpoints
     app.get(
       "/api/v1/users/classes/:id",
       verifyToken,
@@ -359,6 +335,47 @@ async function run() {
         res.send(result);
       }
     );
+
+    app.get(
+      "/api/v1/users/my-classes/:email",
+      verifyToken,
+      async (req, res) => {
+        const userEmail = req.decoded.email;
+        const paramEmail = req.params.email;
+        // console.log("paramEmail:", paramEmail);
+        // console.log("decodedEmail:", req.decoded.email);
+
+        if (paramEmail !== userEmail) {
+          return res.status(403).send({ message: "forbidden access" });
+        }
+
+        const userPayments = await paymentCollection
+          .find({ email: userEmail })
+          .toArray();
+
+        const uniqueClassIds = [
+          ...new Set(userPayments.flatMap((payment) => payment.classId)),
+        ];
+
+        const classes = await classCollection
+          .find({
+            _id: { $in: uniqueClassIds.map((id) => new ObjectId(id)) },
+          })
+          .toArray();
+
+        res.send({ classes });
+      }
+    );
+
+    app.get("/api/v1/classes/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      // console.log("id class req", id);
+      const query = { _id: new ObjectId(id) };
+      const result = await classCollection.findOne(query);
+      res.send(result);
+    });
+
+    // class position problem
 
     app.get(
       "/api/v1/users/classes-requests",
@@ -513,6 +530,40 @@ async function run() {
       }
     );
 
+    app.get("/api/v1/top-sale", async (req, res) => {
+      const payments = await paymentCollection.find().toArray();
+
+      const classEnrollments = {};
+      payments.forEach((payment) => {
+        payment.classId.forEach((classId) => {
+          if (classEnrollments[classId]) {
+            classEnrollments[classId]++;
+          } else {
+            classEnrollments[classId] = 1;
+          }
+        });
+      });
+
+      const sortedClassEnrollments = Object.entries(classEnrollments).sort(
+        ([, a], [, b]) => b - a
+      );
+
+      const topSalesClassIds = sortedClassEnrollments
+        .slice(0, 4)
+        .map(([classId]) => classId);
+
+      const topSalesClasses = await Promise.all(
+        topSalesClassIds.map(async (classId) => {
+          const classData = await classCollection.findOne({
+            _id: new ObjectId(classId),
+          });
+          return classData;
+        })
+      );
+
+      res.send({ topSalesClasses });
+    });
+
     app.get("/api/v1/payments/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
@@ -548,6 +599,24 @@ async function run() {
     });
 
     // feedback related endpoints
+    app.get(
+      "/api/v1/users/class-feedback-admin/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        console.log("feedback id", id);
+        const query = { classId: id };
+        const result = await feedbackCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
+
+    app.get("/api/v1/users/all-feedbacks", async (req, res) => {
+      const result = await feedbackCollection.find().toArray();
+      res.send(result);
+    });
+
     app.post("/api/v1/users/class-feedback", verifyToken, async (req, res) => {
       const feedback = req.body;
       const result = await feedbackCollection.insertOne(feedback);
@@ -561,7 +630,7 @@ async function run() {
       async (req, res) => {
         const id = req.params.classId;
         // console.log("assignment", id)
-        const query = { classId: id };        
+        const query = { classId: id };
         const result = await assignmentCollection.find(query).toArray();
         res.send(result);
       }
@@ -574,8 +643,10 @@ async function run() {
       async (req, res) => {
         const classId = req.params.classId;
         // console.log("total assignment", classId)
-        const totalAssignments = await assignmentCollection.countDocuments({classId});        
-        res.send({totalAssignments});
+        const totalAssignments = await assignmentCollection.countDocuments({
+          classId,
+        });
+        res.send({ totalAssignments });
       }
     );
 
@@ -613,6 +684,53 @@ async function run() {
         res.send(result);
       }
     );
+
+    // partners related endpoints
+    app.get("/api/v1/partners", async (req, res) => {
+      const result = await partnerCollection.find().toArray();
+      res.send(result);
+    });
+
+    // faq related endpoints
+    app.get("/api/v1/faqs", async (req, res) => {
+      const result = await faqCollection.find().toArray();
+      res.send(result);
+    });
+
+    // news letter related endpoints
+    app.post("/api/v1/newsLetters", async (req, res) => {
+      const newsLetter = req.body;
+      console.log("emailed");
+      const result = await newsLetterCollection.insertOne(newsLetter);
+      res.send(result);
+    });
+
+    // statistics related endpoints
+    app.get("/api/v1/statistics", async (req, res) => {
+      const users = { $or: [{ role: "teacher" }, { role: "student" }] };
+      const classes = { status: "approved" };
+      const totalUsers = await userCollection.countDocuments(users);
+      const totalClasses = await classCollection.countDocuments(classes);
+
+      // total enrollments
+      const result = await paymentCollection
+        .aggregate([
+          {
+            $unwind: "$classId",
+          },          
+          {
+            $group: {
+              _id: null,
+              count: { $sum: 1 },
+            },
+          },
+        ])
+        .toArray();
+
+      const totalEnrollments = result.length > 0 ? result[0].count : 0;
+
+      res.send({ totalUsers, totalClasses, totalEnrollments });
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
