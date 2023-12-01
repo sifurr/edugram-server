@@ -165,6 +165,23 @@ async function run() {
       }
     );
 
+    // search user
+    app.get("/api/v1/users/find", verifyToken, verifyAdmin, async (req, res) => {
+      
+        const search = req.query.search;  
+        console.log("search test: ",search)  
+        if (!search) {
+          return res.status(400).send({ error: 'Search parameter is required' });
+        } 
+         
+        
+        const query = { $or: [{ name: search }, { email: search }] };     
+        
+        const result = await userCollection.findOne(query);
+        res.send(result);      
+    });
+
+
     app.patch(
       "/api/v1/users/add-phone/:email",
       verifyToken,
@@ -284,7 +301,7 @@ async function run() {
           const userFilter = { email: userEmail };
 
           const statusUpdateDoc = {
-            $set: { approval: "pending" },
+            $set: { approval: "rejected" },
           };
           await teacherRequestCollection.updateOne(filter, statusUpdateDoc);
 
@@ -506,6 +523,34 @@ async function run() {
       async (req, res) => {
         const classId = req.params.classId;
 
+        const result = await paymentCollection
+          .aggregate([
+            {
+              $unwind: "$classId",
+            },
+            {
+              $match: {
+                classId: classId,
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                count: { $sum: 1 },
+              },
+            },
+          ])
+          .toArray();
+
+        const totalEnrollments = result.length > 0 ? result[0].count : 0;
+        res.send({ totalEnrollments });
+      }
+    );
+
+    app.get(
+      "/api/v1/payments/individual-class-enrollments/:classId",    
+      async (req, res) => {
+        const classId = req.params.classId;
         const result = await paymentCollection
           .aggregate([
             {
