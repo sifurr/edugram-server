@@ -11,12 +11,23 @@ const stripe = require("stripe")(process.env.PAYMENT_GATEWAY_SECRET);
 //middlewares
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:5174","https://splendorous-kheer-a4858e.netlify.app"],
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "https://splendorous-kheer-a4858e.netlify.app",
+      "https://656a7d0d68c8cf615297e8b7--splendorous-kheer-a4858e.netlify.app",
+    ],
     credentials: true,
   })
 );
 app.use(express.json());
-app.use(cookieParser());
+// app.use(cookieParser());
+app.use(
+  cookieParser({
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "None",
+  })
+);
 
 const verifyToken = (req, res, next) => {
   const token = req.cookies?.token;
@@ -74,9 +85,13 @@ async function run() {
       // console.log(token);
       res
         .cookie("token", token, {
+          // secure: process.env.NODE_ENV === "production",
+          // sameSite: "None",
+
           httpOnly: true,
-          secure: false,
-          // sameSite: "none",
+          secure: false
+          // secure: process.env.NODE_ENV === 'production',
+          // sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
         })
         .send({ success: true });
     });
@@ -166,21 +181,25 @@ async function run() {
     );
 
     // search user
-    app.get("/api/v1/users/find", verifyToken, verifyAdmin, async (req, res) => {
-      
-        const search = req.query.search;  
-        // console.log("search test: ",search)  
+    app.get(
+      "/api/v1/users/find",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const search = req.query.search;
+        // console.log("search test: ",search)
         if (!search) {
-          return res.status(400).send({ error: 'Search parameter is required' });
-        } 
-         
-        
-        const query = { $or: [{ name: search }, { email: search }] };     
-        
-        const result = await userCollection.findOne(query);
-        res.send(result);      
-    });
+          return res
+            .status(400)
+            .send({ error: "Search parameter is required" });
+        }
 
+        const query = { $or: [{ name: search }, { email: search }] };
+
+        const result = await userCollection.findOne(query);
+        res.send(result);
+      }
+    );
 
     app.patch(
       "/api/v1/users/add-phone/:email",
@@ -548,7 +567,7 @@ async function run() {
     );
 
     app.get(
-      "/api/v1/payments/individual-class-enrollments/:classId",    
+      "/api/v1/payments/individual-class-enrollments/:classId",
       async (req, res) => {
         const classId = req.params.classId;
         const result = await paymentCollection
@@ -762,7 +781,7 @@ async function run() {
         .aggregate([
           {
             $unwind: "$classId",
-          },          
+          },
           {
             $group: {
               _id: null,
