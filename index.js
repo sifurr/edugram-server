@@ -11,7 +11,7 @@ const stripe = require("stripe")(process.env.PAYMENT_GATEWAY_SECRET);
 //middlewares
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: ["http://localhost:5173", "http://localhost:5174","https://splendorous-kheer-a4858e.netlify.app"],
     credentials: true,
   })
 );
@@ -169,7 +169,7 @@ async function run() {
     app.get("/api/v1/users/find", verifyToken, verifyAdmin, async (req, res) => {
       
         const search = req.query.search;  
-        console.log("search test: ",search)  
+        // console.log("search test: ",search)  
         if (!search) {
           return res.status(400).send({ error: 'Search parameter is required' });
         } 
@@ -327,7 +327,7 @@ async function run() {
       verifyToken,
       async (req, res) => {
         const paramsEmail = req.params.email;
-        console.log("params Email", paramsEmail);
+        // console.log("params Email", paramsEmail);
         const tokenEmailFromVerifyToken = req.decoded.email;
         // console.log("token Email",tokenEmailFromVerifyToken)
         if (paramsEmail !== tokenEmailFromVerifyToken) {
@@ -650,7 +650,7 @@ async function run() {
       verifyAdmin,
       async (req, res) => {
         const id = req.params.id;
-        console.log("feedback id", id);
+        // console.log("feedback id", id);
         const query = { classId: id };
         const result = await feedbackCollection.find(query).toArray();
         res.send(result);
@@ -745,7 +745,7 @@ async function run() {
     // news letter related endpoints
     app.post("/api/v1/newsLetters", async (req, res) => {
       const newsLetter = req.body;
-      console.log("emailed");
+      // console.log("emailed");
       const result = await newsLetterCollection.insertOne(newsLetter);
       res.send(result);
     });
@@ -778,10 +778,10 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
