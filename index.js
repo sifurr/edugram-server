@@ -85,11 +85,11 @@ async function run() {
       // console.log(token);
       res
         .cookie("token", token, {
-          // secure: process.env.NODE_ENV === "production",
-          // sameSite: "None",
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "None",
 
-          httpOnly: true,
-          secure: false
+          // httpOnly: true,
+          // secure: false
           // secure: process.env.NODE_ENV === 'production',
           // sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
         })
@@ -565,6 +565,36 @@ async function run() {
         res.send({ totalEnrollments });
       }
     );
+
+    app.get(
+      "/api/v1/payments-enrollments/:classId",      
+      async (req, res) => {
+        const classId = req.params.classId;
+
+        const result = await paymentCollection
+          .aggregate([
+            {
+              $unwind: "$classId",
+            },
+            {
+              $match: {
+                classId: classId,
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                count: { $sum: 1 },
+              },
+            },
+          ])
+          .toArray();
+
+        const totalEnrollments = result.length > 0 ? result[0].count : 0;
+        res.send({ totalEnrollments });
+      }
+    );
+
 
     app.get(
       "/api/v1/payments/individual-class-enrollments/:classId",
