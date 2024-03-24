@@ -12,6 +12,7 @@ const stripe = require("stripe")(process.env.PAYMENT_GATEWAY_SECRET);
 app.use(
   cors({
     origin: [
+      "http://localhost:3000",
       "http://localhost:5173",
       "http://localhost:5174",
       "https://splendorous-kheer-a4858e.netlify.app",
